@@ -15,6 +15,7 @@
   --biru-muda: #e3f2fd;
   --kuning: #f9a825;
   --merah: #c62828;
+  --ungu: #7b1fa2;
   --abu: #546e7a;
   --shadow: 0 4px 20px rgba(0,0,0,0.1);
 }
@@ -267,8 +268,9 @@ header::after {
   padding: 3px 10px; border-radius: 12px; font-weight: 700;
   font-size: 0.72rem;
 }
-.mood-tag.paham { background: #e8f5e9; color: var(--hijau-tua); }
-.mood-tag.cukup { background: #fff8e1; color: #e65100; }
+/* Sesuai nilai mood di LKPD: 'Sangat paham', 'Cukup paham', 'Masih bingung' */
+.mood-tag.paham   { background: #e8f5e9; color: var(--hijau-tua); }
+.mood-tag.cukup   { background: #fff8e1; color: #e65100; }
 .mood-tag.bingung { background: #ffebee; color: var(--merah); }
 
 /* Tombol detail */
@@ -296,7 +298,7 @@ header::after {
 .modal-overlay.open { display: flex; }
 .modal-box {
   background: white; border-radius: 20px; width: 100%;
-  max-width: 560px; max-height: 90vh; overflow-y: auto;
+  max-width: 580px; max-height: 90vh; overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0,0,0,0.3);
   animation: slideUp 0.25s ease;
 }
@@ -332,12 +334,14 @@ header::after {
   background: #f9f9f9; font-size: 0.85rem;
 }
 .detail-anggota-row .no {
-  background: #7b1fa2; color: white; width: 24px; height: 24px;
+  background: var(--ungu); color: white; width: 24px; height: 24px;
   border-radius: 50%; display: flex; align-items: center; justify-content: center;
   font-size: 0.75rem; font-weight: 800; flex-shrink: 0;
 }
 .detail-anggota-row .nama { font-weight: 700; flex: 1; }
 .detail-anggota-row .peran { font-size: 0.75rem; color: var(--abu); }
+.detail-anggota-row .bagian { font-size: 0.72rem; color: #6a1b9a; font-weight: 600; }
+
 .detail-bagian-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 7px 12px; border-radius: 8px; margin-bottom: 5px;
@@ -345,12 +349,25 @@ header::after {
 }
 .detail-bagian-row.selesai { background: #e8f5e9; }
 .detail-bagian-row.belum   { background: #f5f5f5; color: #9e9e9e; }
-.detail-checklist { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Checklist di modal */
+.detail-checklist { display: flex; flex-direction: column; gap: 5px; }
 .detail-checklist span {
-  font-size: 0.75rem; padding: 3px 10px; border-radius: 12px; font-weight: 700;
+  font-size: 0.8rem; padding: 5px 12px; border-radius: 8px; font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
 }
 .detail-checklist .ck-done { background: #e8f5e9; color: var(--hijau-tua); }
 .detail-checklist .ck-todo { background: #f5f5f5; color: #9e9e9e; }
+
+/* PJ pills di modal */
+.pj-pill {
+  display: inline-block;
+  font-size: 0.72rem; font-weight: 700;
+  background: #e8eaf6; color: #283593;
+  padding: 2px 8px; border-radius: 10px;
+  margin-left: 6px; border: 1px solid #9fa8da;
+  vertical-align: middle;
+}
 
 /* ── LOG AKTIVITAS ── */
 .log-box {
@@ -496,6 +513,7 @@ header::after {
 
 <script>
 // ===== FIREBASE =====
+// URL harus sama dengan LKPD: https://lkpd-bab6-default-rtdb.asia-southeast1.firebasedatabase.app
 const FIREBASE_URL = 'https://lkpd-bab6-default-rtdb.asia-southeast1.firebasedatabase.app';
 
 let sesiAktif = null;
@@ -561,202 +579,4 @@ function stopSesi() {
   clearInterval(intervalId);
   intervalId = null;
   sesiAktif = null;
-  document.getElementById('statusSesi').style.display = 'none';
-  document.getElementById('btnStop').style.display = 'none';
-  addLog('Sesi dihentikan.');
-  showToast('Pemantauan dihentikan.', '#546e7a');
-}
-
-// ===== REFRESH DATA =====
-async function refreshData() {
-  if (!sesiAktif) return;
-  const btn = document.getElementById('btnRefresh');
-  if (btn) btn.classList.add('spinning');
-
-  try {
-    const url = FIREBASE_URL + '/sesi/' + sesiAktif + '.json';
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const raw = await res.json();
-
-    if (!raw) {
-      dataKelompok = {};
-      renderKartu();
-      if (btn) btn.classList.remove('spinning');
-      return;
-    }
-
-    // Deteksi kelompok baru
-    const prev = Object.keys(dataKelompok);
-    const curr = Object.keys(raw);
-    curr.forEach(k => {
-      if (!prev.includes(k)) {
-        addLog('Kelompok baru masuk: ' + (raw[k].namaKelompok || k));
-        showToast('Kelompok baru: ' + (raw[k].namaKelompok || k), '#1565c0');
-      } else if (dataKelompok[k] && raw[k].progres !== dataKelompok[k].progres) {
-        addLog((raw[k].namaKelompok || k) + ' memperbarui progres → ' + raw[k].progres + '%');
-      }
-    });
-
-    dataKelompok = raw;
-    renderKartu();
-    updateStats();
-  } catch(e) {
-    addLog('Gagal mengambil data: ' + e.message);
-    showToast('Gagal refresh. Periksa koneksi.', '#c62828');
-  }
-  if (btn) btn.classList.remove('spinning');
-}
-
-// ===== UPDATE STATS =====
-function updateStats() {
-  const list = Object.values(dataKelompok);
-  const total = list.length;
-  const tinggi = list.filter(k => k.progres >= 80).length;
-  const sedang = list.filter(k => k.progres >= 40 && k.progres < 80).length;
-  const rendah = list.filter(k => k.progres < 40).length;
-  document.getElementById('statTotal').textContent = total;
-  document.getElementById('statSelesai').textContent = tinggi;
-  document.getElementById('statProgresSedang').textContent = sedang;
-  document.getElementById('statPerluBantuan').textContent = rendah;
-}
-
-// ===== RENDER KARTU =====
-function renderKartu() {
-  const grid = document.getElementById('kelompokGrid');
-  const empty = document.getElementById('emptyState');
-  const list = Object.entries(dataKelompok);
-
-  if (!list.length) {
-    grid.innerHTML = `<div class="empty-state" id="emptyState">
-      <div class="icon">⏳</div>
-      <p>Menunggu kelompok mengirim progres...<br>Pastikan siswa sudah memasukkan kode <strong>${sesiAktif}</strong> di LKPD.</p>
-    </div>`;
-    return;
-  }
-
-  // Sort
-  const sortBy = document.getElementById('sortSelect').value;
-  list.sort((a, b) => {
-    if (sortBy === 'nama') return (a[1].namaKelompok||'').localeCompare(b[1].namaKelompok||'');
-    if (sortBy === 'waktu') return (b[1].timestamp||0) - (a[1].timestamp||0);
-    return (b[1].progres||0) - (a[1].progres||0); // default: progres turun
-  });
-
-  grid.innerHTML = list.map(([id, k]) => {
-    const prog = k.progres || 0;
-    const kelasCard = prog >= 80 ? 'prog-tinggi' : prog >= 40 ? 'prog-sedang' : 'prog-rendah';
-    const anggotaHtml = (k.anggota || []).map(a =>
-      `<span>${a.nama || '-'}</span>`
-    ).join('');
-    const bagianHtml = (k.detailBagian || []).map(b =>
-      `<span class="chip ${b.selesai ? 'done' : 'todo'}" title="${b.label}">${b.selesai ? '✓' : '○'} ${b.label.split('–')[0].trim()}</span>`
-    ).join('');
-    const moodKelas = k.mood === 'Sangat paham' ? 'paham' : k.mood === 'Cukup paham' ? 'cukup' : 'bingung';
-    const moodEmoji = k.mood === 'Sangat paham' ? '🤩' : k.mood === 'Cukup paham' ? '🙂' : k.mood ? '😕' : '—';
-
-    return `<div class="kelompok-card ${kelasCard}">
-      <div class="card-header">
-        <div>
-          <div class="card-nama">${k.namaKelompok || id}</div>
-          <div class="card-kelas">${k.kelas || ''} · ${k.jumlahAnggota || '?'} anggota</div>
-        </div>
-        <div class="badge-persen">${prog}%</div>
-      </div>
-      <div class="progbar-wrap">
-        <div class="progbar-fill" style="width:${prog}%"></div>
-      </div>
-      <div class="bagian-chips">${bagianHtml}</div>
-      <div class="anggota-mini">${anggotaHtml}</div>
-      <div class="card-footer">
-        <div>
-          <span class="mood-tag ${moodKelas}">${moodEmoji} ${k.mood || '-'}</span>
-        </div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <span>${k.waktuKirim ? k.waktuKirim.split(',')[1]?.trim() || k.waktuKirim : '-'}</span>
-          <button class="btn-detail" onclick="bukaDetail('${id}')">Detail</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// ===== MODAL DETAIL =====
-function bukaDetail(id) {
-  const k = dataKelompok[id];
-  if (!k) return;
-
-  document.getElementById('modalJudul').textContent = '📋 ' + (k.namaKelompok || id);
-
-  const CHECKLIST_LABEL = [
-    'Semua anggota menonton video',
-    'Pembagian tugas disepakati',
-    'Bagian A selesai',
-    'Bagian B selesai',
-    'Bagian C selesai',
-    'Tabel ekosistem selesai',
-    'Refleksi selesai',
-    'Jawaban didiskusikan bersama',
-  ];
-
-  const anggotaHtml = (k.anggota || []).map((a, i) => `
-    <div class="detail-anggota-row">
-      <div class="no">${i+1}</div>
-      <div class="nama">${a.nama || '-'}</div>
-      <div class="peran">${a.peran || '-'} · ${a.bagian || '-'}</div>
-    </div>`).join('');
-
-  const bagianHtml = (k.detailBagian || []).map(b => `
-    <div class="detail-bagian-row ${b.selesai ? 'selesai' : 'belum'}">
-      <span>${b.selesai ? '✅' : '⬜'} ${b.label}</span>
-      <span style="font-weight:700;">${b.bobot}%</span>
-    </div>`).join('');
-
-  const ceklistHtml = (k.progChecklist || []).map((v, i) => `
-    <span class="${v ? 'ck-done' : 'ck-todo'}">${v ? '✓' : '○'} ${CHECKLIST_LABEL[i] || 'Item '+(i+1)}</span>
-  `).join('');
-
-  document.getElementById('modalBody').innerHTML = `
-    <div class="detail-section">
-      <h4>Info Kelompok</h4>
-      <p style="font-size:0.85rem; color:#37474f; line-height:1.8;">
-        <strong>Kelas:</strong> ${k.kelas || '-'}<br>
-        <strong>Jumlah Anggota:</strong> ${k.jumlahAnggota || '-'}<br>
-        <strong>Terakhir Kirim:</strong> ${k.waktuKirim || '-'}<br>
-        <strong>Perasaan:</strong> ${k.mood || '-'}
-      </p>
-    </div>
-    <div class="detail-section">
-      <h4>Daftar Anggota & Tugas</h4>
-      ${anggotaHtml || '<p style="font-size:0.82rem; color:#9e9e9e;">Belum diisi</p>'}
-    </div>
-    <div class="detail-section">
-      <h4>Progres per Bagian (Total: ${k.progres || 0}%)</h4>
-      ${bagianHtml || '<p style="font-size:0.82rem; color:#9e9e9e;">Belum ada data</p>'}
-    </div>
-    <div class="detail-section">
-      <h4>Checklist Progres Kelompok</h4>
-      <div class="detail-checklist">
-        ${ceklistHtml || '<span style="font-size:0.8rem; color:#9e9e9e;">Belum diisi</span>'}
-      </div>
-    </div>
-  `;
-  document.getElementById('modalOverlay').classList.add('open');
-}
-
-function tutupModal(e) {
-  if (!e || e.target === document.getElementById('modalOverlay') || !e.target) {
-    document.getElementById('modalOverlay').classList.remove('open');
-  }
-}
-
-// ===== RESTORE SESI SEBELUMNYA =====
-window.addEventListener('load', () => {
-  const savedKode = localStorage.getItem('dashboard_kode');
-  const savedGuru = localStorage.getItem('dashboard_guru');
-  if (savedKode) document.getElementById('inputKode').value = savedKode;
-  if (savedGuru) document.getElementById('inputNamaGuru').value = savedGuru;
-});
-</script>
-</body>
-</html>
+  document.getElementById('statusSesi').style.di
